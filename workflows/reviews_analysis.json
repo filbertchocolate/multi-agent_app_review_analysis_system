@@ -1,0 +1,1566 @@
+{
+  "name": "reviews_analysis",
+  "nodes": [
+    {
+      "parameters": {
+        "collection": "=app_reviews_{{ $json.input }}",
+        "options": {
+          "limit": 10
+        }
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        5680,
+        3280
+      ],
+      "id": "1fec932b-7f36-48e4-ab35-0e811880a9b5",
+      "name": "Find documents",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mongoDb": {
+          "id": "15w6IyvgHLjLHFmC",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "洞察真相-需求分析",
+        "height": 736,
+        "width": 3376
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        5104,
+        2896
+      ],
+      "typeVersion": 1,
+      "id": "5d0d088a-1d02-4b0b-a12c-af462e8281f8",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "ali/qwen3-max",
+          "mode": "list",
+          "cachedResultName": "ali/qwen3-max"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        6192,
+        3296
+      ],
+      "id": "d937b919-fede-48f6-aae9-f7a95a21eafb",
+      "name": "Qwen-turbo",
+      "credentials": {
+        "openAiApi": {
+          "id": "TfEeHkaNCRrkvl64",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        5968,
+        3280
+      ],
+      "id": "0970745f-b64f-48f7-9754-de5c83c29915",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "name": "Replace Me",
+      "typeVersion": 1,
+      "position": [
+        8320,
+        3280
+      ],
+      "id": "ee870f60-e886-47c5-b700-87c990ece27d"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "collection": "=app_reviews_{{ $('Webhook1').item.json.body.data }}",
+        "fields": "is_analyzed",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        8096,
+        3056
+      ],
+      "id": "c36fcfba-c650-4368-8c1e-64be50c6f8dd",
+      "name": "Update源数据标注",
+      "credentials": {
+        "mongoDb": {
+          "id": "15w6IyvgHLjLHFmC",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "38f85e38-a277-48e8-92c8-a56078ac0770",
+              "name": "id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "74a70efe-89e4-4c09-ba96-102d33aa32d9",
+              "name": "is_analyzed",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        7872,
+        3056
+      ],
+      "id": "464510c6-ab27-4791-8f26-5c75f356cfe9",
+      "name": "准备关联"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=标题：{{ $json.title }}\n用户评论: {{ $json.content }}",
+        "options": {
+          "systemMessage": "你是基于 Research Onion (解释主义视角) 的“现象观察员”。\n你的任务是阅读用户评论，还原用户所处的真实情境 (Phenomenon)，并进行精准的领域分类。\n\n工具能力，你有一个产品功能模块的知识库，对于陌生产品评论，先调用工具检查该产品的核心功能模块。\n**严禁**进行任何心理分析或优先级判断，只输出客观事实和环境。\n\n**分类标准 (Category Guidelines)**:\n- **Product_Function**: App 内部的功能、交互、性能、UI、支付流程问题。（这是产品经理需要关注的）\n- **Operation_Promotion**: App 外部的激励、推广任务、运营活动。**特指：蚂蚁森林绿色能量、学校/公司强制下载任务、地推礼品没收到、邀请好友奖励未到账。**\n- **Service**: 客服态度、物流发货。\n- **Irrelevant**: 纯乱码、与本软件毫无关系的广告、完全无法理解的内容。\n\n**输出纯 JSON (无 markdown)**:\n{\n  \"category\": \"必须从 [产品功能, 运营, 推广, 用户服务, 不相关] 中选一个\",\n\n  \"feature_focus\": \"如果是产品功能，填具体功能(如: 蓝牙连接)；如果是运营或推广，填具体活动(如: 蚂蚁森林能量)；否则填 N/A\",\n\n  \"user_level\": \"基于行为推断的用户画像\",\n  // 选项:\n  // - \"New User\" (新用户: 找不到入口/初次使用)\n  // - \"Active User\" (活跃用户: 有具体场景/深度使用)\n  // - \"Vip User\" (付费用户: 提及会员权益)\n  // - \"Churn Risk\" (即将流失: 极度愤怒/我要卸载)\n  // - \"Non-Critical\" (非关键: 只有情绪无内容/纯羊毛党)\n  // - \"Unknown\" (不明)\n\n  \"scenario_context\": \"还原用户使用时的物理环境和社会环境 (关键：识别用户是'为了用功能'还是'为了做任务')\",\n  // 示例: \"用户为了获取蚂蚁森林能量而被动下载App，并未真正体验医疗功能。\"\n\n  \"explicit_pain_point\": \"用户明确表达的障碍 (原话摘要)\"\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        6256,
+        3056
+      ],
+      "id": "cbfbf7a9-1b21-494a-80a7-55fa8243cb5d",
+      "name": "需求分析"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "ali/qwen3-max",
+          "mode": "list",
+          "cachedResultName": "ali/qwen3-max"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        6784,
+        3280
+      ],
+      "id": "116488fa-d506-45e3-9f92-511126b0ab4e",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "TfEeHkaNCRrkvl64",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=场景上下文: {{ $json.output }}\n",
+        "options": {
+          "systemMessage": "你是精通 UTAUT2 理论的心理学专家。你的任务是将“用户场景”转译为“心理构念”。\n实现映射：[Phenomenon] -> [Psychological Construct].\n\n仅根据输入的【场景上下文】进行判断。\n\nUTAUT2 维度定义:\n- PE (有用吗): 核心价值/绩效。\n- EE (好用吗): 交互/门槛。\n- SI (有面子吗): 社交/炫耀。\n- FC (能用吗): 兼容性/条件。\n- HM (爽吗): 情绪/享乐。\n- PV (值吗): 价格。\n- HT (习惯吗): 迁移成本。\n\n请输出纯 JSON:\n1. utaut_dimension: 选出最核心的一个维度 (如: EE)。\n2. utaut_role: Driver (驱动力) / Barrier (阻碍力)。\n3. psychology_tag: 用产品经理能看懂的语言简述 (如: 过高的努力期望值会导致挫败感)。"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        6704,
+        3056
+      ],
+      "id": "63cabd61-e30b-4a22-b841-a4cfcf4d8545",
+      "name": "心理转译"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "ali/qwen3-max",
+          "mode": "list",
+          "cachedResultName": "ali/qwen3-max"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        7136,
+        3280
+      ],
+      "id": "80df9575-fa63-4b25-ada3-85ad731bc41c",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "TfEeHkaNCRrkvl64",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "insert",
+        "memoryKey": {
+          "__rl": true,
+          "mode": "list",
+          "value": "vector_store_key"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1.3,
+      "position": [
+        5616,
+        3680
+      ],
+      "id": "64735748-4a91-4247-b674-6346225cc3cb",
+      "name": "Simple Vector Store"
+    },
+    {
+      "parameters": {
+        "dataType": "binary",
+        "loader": "textLoader",
+        "textSplittingMode": "custom",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.documentDefaultDataLoader",
+      "typeVersion": 1.1,
+      "position": [
+        5600,
+        3904
+      ],
+      "id": "4e7fc9e0-878b-4b63-9cdc-e9566bb93009",
+      "name": "Default Data Loader"
+    },
+    {
+      "parameters": {
+        "chunkSize": 1024,
+        "chunkOverlap": 0.5,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.textSplitterRecursiveCharacterTextSplitter",
+      "typeVersion": 1,
+      "position": [
+        5680,
+        4112
+      ],
+      "id": "d0a6f8ec-0f2d-485a-9a26-d5125442c089",
+      "name": "Recursive Character Text Splitter"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        5376,
+        3856
+      ],
+      "id": "349068a5-8b64-4ca0-9d07-e2cf0e97e333",
+      "name": "Loop Over Items1"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "name": "Replace Me1",
+      "typeVersion": 1,
+      "position": [
+        5968,
+        3856
+      ],
+      "id": "310e9b26-2f5c-43c0-a74b-6603686b28e5"
+    },
+    {
+      "parameters": {
+        "model": "Qwen/Qwen3-Embedding-8B",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        6560,
+        3872
+      ],
+      "id": "bb8a9fd2-b7c8-4538-875e-73f82489ae44",
+      "name": "Embeddings OpenAI",
+      "credentials": {
+        "openAiApi": {
+          "id": "xs6X1kmeua2xdrzt",
+          "name": "siliconcloud"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "/chat-onboarding",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        5152,
+        3856
+      ],
+      "id": "af65fba9-fc9d-4bb1-a6be-172b174690dc",
+      "name": "Webhook",
+      "webhookId": "5afd26b2-1d14-4266-be12-fdf725f19866"
+    },
+    {
+      "parameters": {
+        "description": "使用此工具执行基于向量的相关文档检索，检索产品核心功能模块。",
+        "topK": 3
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "typeVersion": 1.1,
+      "position": [
+        6320,
+        3280
+      ],
+      "id": "4bbb39a3-6cfd-40ef-b3c9-d78e36f02d85",
+      "name": "Answer questions with a vector store"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "ali/qwen3-max",
+          "mode": "list",
+          "cachedResultName": "ali/qwen3-max"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        6512,
+        3488
+      ],
+      "id": "642d3a2c-93a0-4f3b-9a99-e34f8a03e72a",
+      "name": "OpenAI Chat Model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "TfEeHkaNCRrkvl64",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "memoryKey": {
+          "__rl": true,
+          "mode": "list",
+          "value": "vector_store_key"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1.3,
+      "position": [
+        6224,
+        3488
+      ],
+      "id": "173156bc-e107-4f79-8515-224fed6ef79c",
+      "name": "Simple Vector Store1"
+    },
+    {
+      "parameters": {
+        "content": "喂食档案-产品文档分析",
+        "height": 640,
+        "width": 1648,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        5088,
+        3648
+      ],
+      "typeVersion": 1,
+      "id": "19b80f5c-8d8d-475c-ab13-75febcfed59a",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ============================================\n// 1. 获取输入数据\n// ============================================\nconst aiResponse = $input.item.json.output;\nconst inputFromEditFields = $('Edit Fields').first().json.input;\n\nif (!aiResponse) {\n    throw new Error(\"未找到 AI 回复内容!\");\n}\n\n// ============================================\n// 2. 获取原始数据的 ID (修复点：使用 .first() 而非 .item)\n// ============================================\n// 前置条件：必须将 Loop Over Items 节点的 Batch Size 设置为 1\nlet originalReview;\ntry {\n    originalReview = $('Loop Over Items').first().json;\n} catch (error) {\n    console.error(\"获取原始数据失败，请检查 Loop 节点配置\");\n}\n\n// 调试日志\nconsole.log('当前处理的原始评论ID:', originalReview ? originalReview.id : 'undefined');\n\nif (!originalReview || !originalReview.id) {\n    throw new Error(\"未能获取原始评论数据的 ID，请确保 Loop Over Items 节点 Batch Size 为 1\");\n}\n\n// ============================================\n// 3. 清洗 Markdown 标记 (修复点：使用正则提取)\n// ============================================\nlet result;\ntry {\n    // 提取第一个 JSON 对象 {...}\n    const jsonMatch = aiResponse.match(/\\{[\\s\\S]*\\}/);\n    const cleanJson = jsonMatch ? jsonMatch[0] : aiResponse.replace(/```json/g, '').replace(/```/g, '').trim();\n    \n    result = JSON.parse(cleanJson);\n} catch (e) {\n    console.error('JSON 解析失败:', e.message);\n    // 容错数据\n    result = {\n        category: \"解析错误\",\n        feature_module: \"解析错误\",\n        rationale: \"AI返回格式有误: \" + aiResponse,\n        user_level: \"Unknown\",\n        scenario_context: \"N/A\",\n        root_cause_category: \"数据解析失败\",\n        impact_scope: \"N/A\"\n    };\n}\n\n// 5. RICE 核心算法计算\n// ============================================\n// 确保数值存在，防止 NaN\nconst R = Number(result.reach_score) || 0.5;\nconst I = Number(result.impact_score) || 0.5;\nconst C = Number(result.confidence_score) || 0.5;\nconst E = Number(result.effort_score) || 5; // 默认为最难，防止分母为0导致无穷大\n\n// 公式: (Reach * Impact * Confidence) / Effort\nconst rawScore = (R * I * C) / (E === 0 ? 0.5 : E); // 防止除以0\n\n// 保留两位小数\nconst finalRiceScore = Math.round(rawScore * 100) / 100;\n\n// ============================================\n// 5. 输出最终结果\n// ============================================\nreturn {\n    id: originalReview.id, // 确保引用的是正确的原始ID\n    \n    category: result.category || result.catagory || \"未分类\",\n    feature_module: result.feature_module || \"N/A\",\n    user_level: result.user_level || \"Unknown\",\n    rice_total_score: finalRiceScore, // 排序依据\n        rice_r: R,\n        rice_i: I,\n        rice_c: C,\n        rice_e: E,\n    scenario_context: result.scenario_context || \"N/A\",\n    root_cause_category: result.root_cause_category || \"N/A\",\n    impact_scope: result.impact_scope || \"N/A\",\n    rationale: result.rationale || \"无\",\n    url: inputFromEditFields,\n    analyzed_at: new Date().toISOString()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        7424,
+        3056
+      ],
+      "id": "5192a281-ed5c-497f-9e55-825e7076288d",
+      "name": "格式化清洗/关联准备"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "collection": "=app_reviews_{{ $json.url }}",
+        "fields": "id, category, feature_module, user_level, rice_total_score, rice_r, rice_i, rice_c, rice_e, scenario_context, root_cause_category, impact_scope, rationale, url, analyzed_at",
+        "upsert": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        7648,
+        3056
+      ],
+      "id": "10fdce1b-bd02-48e1-8037-ab7504dac010",
+      "name": "上传新表",
+      "credentials": {
+        "mongoDb": {
+          "id": "15w6IyvgHLjLHFmC",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=场景事实(Agent A): {{ $('需求分析').item.json.output }}\n心理动因(Agent B): {{ $json.output }}\nurl:\n",
+        "options": {
+          "systemMessage": "你是熟悉RICE评分的产品战略决策官。你的任务是综合“场景”和“心理动因”，输出 PRD 标签。\n实现映射：[Psychological Construct] + [Business Logic] -> [RICE].\n\n工具能力：你可以查看知识库有无历史相似可比的评价情况。\n\n决策逻辑:\n请严格基于以下标准进行估值：\n\n**1. Reach (影响范围 - User Scope)**\n- **100% (Score: 10)**: 核心通用功能 (登录/首页/核心业务流)。\n- **50% (Score: 5)**: 主流功能 (大部分活跃用户会用到)。\n- **20% (Score: 2)**: 细分功能 (仅特定场景/VIP功能)。\n- **5% (Score: 0.5)**: 极边缘功能或个例。\n\n**2. Impact (影响力 - Based on UTAUT2)**\n- **3 (Massive)**: 阻断了 PE (根本没法用) 或 FC (设备不兼容)。\n- **2 (High)**: 严重阻碍 EE (极难用) 导致核心流程中断。\n- **1 (Medium)**: 影响 PV (觉得贵) 或 HT (不习惯)。\n- **0.5 (Low)**: 仅影响 HM (不够爽) 或 SI (没法炫耀)。\n- **0.25 (Minimal)**: 纯视觉微调或文案优化。\n*注：如果是 'Operation_Promotion' (运营活动)，Impact 默认为 0.5 (除非造成大规模舆情)。*\n\n**3. Confidence (信心指数 - Evidence Strength)**\n- **100% (1.0)**: 证据确凿，复现路径清晰，有截图或详细描述。\n- **80% (0.8)**: 描述清晰，逻辑合理。\n- **50% (0.5)**: 描述模糊，只有情绪宣泄，无具体细节。\n\n**4. Effort (工作量预估 - Complexity)**\n- **0.5 (Tiny)**: 文案/配置修改 (1天内)。\n- **1 (Small)**: UI 调整/简单逻辑 (1周内)。\n- **2 (Medium)**: 涉及后端逻辑/新接口 (2周内)。\n- **3 (Large)**: 涉及架构调整/复杂算法 (1月内)。\n- **5 (Extra Large)**: 重构级改动。\n*注：作为 PM 进行保守预估。*\n\n请输出纯 JSON:\n1. category:\"继承需求分析Agent的判断\",\n1. feature_module: \"继承需求分析Agent的判断\",\n2. user_level: \"继承需求分析Agent的判断\", \n3. scenario_context: \"继承需求分析Agent的判断\",\n4. root_cause_category: 问题归因 (如: 性能瓶颈, UX太复杂)。\n5. impact_scope: 影响范围 (如: 病毒式增长, 留存率)。\n6. \"reach_score\": 10,\n7.  \"impact_score\": 3,\n8.  \"confidence_score\": 1.0,\n9.  \"effort_score\": 2,\n10. rationale: 必须基于 UTAUT2 维度用产品经理的通俗语言进行解释，内容中避免提及学术用语。"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        7072,
+        3056
+      ],
+      "id": "848ca056-90ff-49da-ac3a-4a1a25be3801",
+      "name": "评分仲裁"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "167b7acb-802f-43f0-8a4b-0aff7c9bfce8",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        5152,
+        3280
+      ],
+      "id": "65fa6297-c280-4031-bcfc-5c33c6d4a1d3",
+      "name": "Webhook1",
+      "webhookId": "167b7acb-802f-43f0-8a4b-0aff7c9bfce8",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "description": "使用此工具执行基于向量的相关文档检索，检索历史相似、可比历史评价案例。",
+        "topK": 3
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "typeVersion": 1.1,
+      "position": [
+        7264,
+        3312
+      ],
+      "id": "97f961be-0ceb-40df-92ff-975d2badd9a2",
+      "name": "Answer questions with a vector store1"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "ali/qwen3-max",
+          "mode": "list",
+          "cachedResultName": "ali/qwen3-max"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        7392,
+        3504
+      ],
+      "id": "154c3c79-34c9-4a53-99f8-658c35b91e34",
+      "name": "OpenAI Chat Model3",
+      "credentials": {
+        "openAiApi": {
+          "id": "TfEeHkaNCRrkvl64",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mongoCollection": {
+          "__rl": true,
+          "value": "app_reviews_vector_store",
+          "mode": "list",
+          "cachedResultName": "app_reviews_vector_store"
+        },
+        "vectorIndexName": "vector_index",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreMongoDBAtlas",
+      "typeVersion": 1.3,
+      "position": [
+        7072,
+        3504
+      ],
+      "id": "793cfc62-b8a9-4acf-8348-c0fda7a64a97",
+      "name": "MongoDB Atlas Vector Store",
+      "credentials": {
+        "mongoDb": {
+          "id": "15w6IyvgHLjLHFmC",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "Qwen/Qwen3-Embedding-8B",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.embeddingsOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        7056,
+        3680
+      ],
+      "id": "d55670dd-c20b-44e4-b48c-c42f3b00d645",
+      "name": "Embeddings OpenAI1",
+      "credentials": {
+        "openAiApi": {
+          "id": "xs6X1kmeua2xdrzt",
+          "name": "siliconcloud"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c66ac8ca-0817-4929-b2ca-25401e993f86",
+              "name": "input",
+              "value": "={{ $json.body.data }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5376,
+        3280
+      ],
+      "id": "46641cfb-6bce-4e95-9936-e536145d6367",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "248acdd3-8197-4cf5-9082-a72634d2e9ee",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        5248,
+        4672
+      ],
+      "id": "edb1972a-b7ca-41cc-b605-27f9e216b74c",
+      "name": "Webhook2",
+      "webhookId": "248acdd3-8197-4cf5-9082-a72634d2e9ee"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=原评论标题：{{ $json.title }}\n原评论内容：{{ $json.content }}\n助手分析：\n  问题分类：{{ $json.category }}\n  user_level:{{ $json.user_level }}\n  RICE score: {{ $json.rice_total_score }}\n  scenario context: {{ $json.scenario_context }}\n  root cause: {{ $json.root_cause_category }}\n  impact scope:{{ $json.impact_scope }}\n  rationale: {{ $json.rationale }}\n  id: {{ $json.id }}\n  url: {{ $json.url }}",
+        "options": {
+          "systemMessage": "你是一个资深产品经理 (Senior Product Manager) 兼解决方案架构师。你的核心职责是进行最终决策，将用户的原始反馈转化为可执行的产品方案。\n\n# 任务背景\n你处于工作流的决策终端。你需要处理以下信息：\n1. **产品档案 (Product Context)**: 当前产品的核心功能定义。\n2. **用户原声 (User Feedback)**: 用户最直接的输入内容。\n3. **RICE 估算 (Agent C Output)**: 上游精算师给出的 RICE 评分参考。\n\n**重要原则**:\nRICE只是负责提供基于历史数据的量化参考，**它的评分并不代表最终结果**。你需要结合用户原声和产品现状进行独立判断。如果RICE的评分与常识或产品战略冲突，请果断修正优先级。\n\n# 你的任务\n综合上述信息，深入分析用户背后的真实诉求，并输出一份包含“分析摘要”和“PRD文档”的 JSON 结果。\n\n# 思考路径 (Chain of Thought)\n1. **独立定性**: 阅读用户原声。这是核心Bug还是体验优化？是伪需求还是真痛点？\n2. **参考校验**: 查看RICE 分数。\n   - *场景 A*: 用户反馈“无法支付”，Agent C 算分较低（可能是历史数据偏差）。**决策**: 覆盖它，定为 P0。\n   - *场景 B*: 用户反馈“想要个五彩斑斓的黑”，Agent C 算分一般。**决策**: 维持低优先级或砍掉。\n3. **根因分析**: 推导问题的根本原因（是技术性能、交互逻辑还是用户认知偏差？）。\n4. **方案构建**: 基于 MVP 原则设计解决方案。\n\n# 输出格式 (JSON Only)\n请严格输出符合以下结构的 JSON，不要包含任何 Markdown 格式以外的文本：\n\n```json\n{\n  \"analysis_summary\": [\n    {\n      \"pain_point\": \"一针见血的用户痛点 (如：分享流程中断)\",\n      \"root_cause\": \"问题的本质原因 (如：后端图片合成耗时过长)\",\n      \"scenario\": \"用户触发问题的具体场景 (如：高强度运动后渴望即时反馈)\",\n      \"priority\": \"P0 (Critical) | P1 (High) | P2 (Medium) | P3 (Low) - 由你最终裁定\"\n    }\n  ],\n  \"generated_prd\": {\n    \"title\": \"PRD 标题 (动宾结构)\",\n    \"background\": \"项目背景与价值 (结合用户痛点与业务影响)\",\n    \"user_stories\": [\n      \"User Story 1\",\n      \"User Story 2\"\n    ],\n    \"functional_requirements\": [\n      {\n        \"REQ_id\": \"REQ-01\",\n        \"name\": \"功能点名称\",\n        \"description\": \"详细的逻辑描述\",\n        \"acceptance_criteria\": \"明确的验收标准\"\n      }\n    ],\n    \"data_metrics\": [\"核心指标1\", \"核心指标2\"],\n   \"id\": \"保留输入的id“，\n    “url\": \"保留输入的url”,\n  }\n}"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        6176,
+        4496
+      ],
+      "id": "3278b260-13a0-47aa-89f5-3265c7933ec7",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "ali/qwen3-max",
+          "mode": "list",
+          "cachedResultName": "ali/qwen3-max"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        6144,
+        4720
+      ],
+      "id": "fa60964a-b883-486b-849a-e42a8eae2f78",
+      "name": "OpenAI Chat Model4",
+      "credentials": {
+        "openAiApi": {
+          "id": "TfEeHkaNCRrkvl64",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// ============================================\n// 获取前一个节点 (AI Agent) 的输出并进行 JSON 格式化清洗\n// ============================================\nconst aiResponse = $input.item.json.output;\n\nif (!aiResponse) {\n    throw new Error(\"未找到 AI Agent 的输出内容!\");\n}\n\n// ============================================\n// 清洗 Markdown 标记并解析 JSON\n// ============================================\nlet parsedData;\ntry {\n    // 提取 JSON 对象 {...}\n    const jsonMatch = aiResponse.match(/\\{[\\s\\S]*\\}/);\n    const cleanJson = jsonMatch ? jsonMatch[0] : aiResponse.replace(/```json/g, '').replace(/```/g, '').trim();\n    \n    parsedData = JSON.parse(cleanJson);\n} catch (e) {\n    console.error('JSON 解析失败:', e.message);\n    console.error('原始内容:', aiResponse);\n    \n    // 容错处理:返回原始内容和错误信息\n    return {\n        parse_error: true,\n        error_message: e.message,\n        raw_output: aiResponse,\n        analysis_summary: [],\n        generated_prd: {\n            title: \"解析失败\",\n            background: \"AI 返回格式有误\",\n            user_stories: [],\n            functional_requirements: [],\n            data_metrics: []\n        }\n    };\n}\n\n// ============================================\n// 返回所有具体标签(完整的 PRD 结构)\n// ============================================\nreturn {\n    // 分析摘要部分\n    analysis_summary: parsedData.analysis_summary || [],\n    \n    // PRD 文档部分\n    prd_title: parsedData.generated_prd?.title || \"N/A\",\n    prd_background: parsedData.generated_prd?.background || \"N/A\",\n    prd_user_stories: parsedData.generated_prd?.user_stories || [],\n    prd_functional_requirements: parsedData.generated_prd?.functional_requirements || [],\n    prd_data_metrics: parsedData.generated_prd?.data_metrics || [],\n  \n    // 元数据\n    id: parsedData.generated_prd?.id,\n    url: parsedData.generated_prd?.url,\n    parse_success: true,\n    parsed_at: new Date().toISOString()\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6640,
+        4496
+      ],
+      "id": "218268f9-1580-493e-af60-6f09dea327b2",
+      "name": "再一次格式化清洗"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c66ac8ca-0817-4929-b2ca-25401e993f86",
+              "name": "input",
+              "value": "={{ $json.body.data }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5472,
+        4672
+      ],
+      "id": "f66a2f6d-8904-499a-b3f3-c5867c071909",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "collection": "=app_reviews_{{ $json.input }}",
+        "options": {
+          "limit": 10
+        }
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        5696,
+        4672
+      ],
+      "id": "2a146968-1e39-4f0b-896e-4c44cf93d63d",
+      "name": "Find documents1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mongoDb": {
+          "id": "15w6IyvgHLjLHFmC",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "topK": 3
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolVectorStore",
+      "typeVersion": 1.1,
+      "position": [
+        6272,
+        4720
+      ],
+      "id": "244fee35-559e-40f0-9f55-c031a316c627",
+      "name": "Answer questions with a vector store2"
+    },
+    {
+      "parameters": {
+        "memoryKey": {
+          "__rl": true,
+          "mode": "list",
+          "value": "vector_store_key"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.vectorStoreInMemory",
+      "typeVersion": 1.3,
+      "position": [
+        6384,
+        4352
+      ],
+      "id": "b9c4b8ae-a66d-4f07-9b81-a5d9dc3a42a7",
+      "name": "Simple Vector Store2"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "ali/qwen3-max",
+          "mode": "list",
+          "cachedResultName": "ali/qwen3-max"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        6352,
+        4928
+      ],
+      "id": "c96e5f52-4923-45f3-b636-8f22a5ba1885",
+      "name": "OpenAI Chat Model5",
+      "credentials": {
+        "openAiApi": {
+          "id": "TfEeHkaNCRrkvl64",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        5920,
+        4672
+      ],
+      "id": "9ff3ac3a-e0c3-4a34-8074-3c0fa7e0b094",
+      "name": "Loop Over Items2"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "name": "Replace Me2",
+      "typeVersion": 1,
+      "position": [
+        7536,
+        4688
+      ],
+      "id": "eca9d63d-4933-455f-9e37-c92482b4c59d"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "collection": "=prd_{{ $json.url }}",
+        "fields": "analysis_summary, prd_title, prd_background, prd_user_stories, prd_functional_requirements, prd_data_metrics, id, url, parse_success, parsed_at",
+        "upsert": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        6864,
+        4496
+      ],
+      "id": "ce0d042f-c068-41d3-8d14-dbce4cc57ae2",
+      "name": "Update documents",
+      "credentials": {
+        "mongoDb": {
+          "id": "15w6IyvgHLjLHFmC",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "PRD输出",
+        "height": 816,
+        "width": 2720,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        5088,
+        4304
+      ],
+      "typeVersion": 1,
+      "id": "3a5b214c-51e2-4ec5-a763-280a61dac3fe",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "2fc9a291-8737-43fa-8059-85ccd4a17239",
+              "name": "id",
+              "value": "={{ $json.id }}",
+              "type": "string"
+            },
+            {
+              "id": "8b200f9f-ba4a-4d93-9c51-e14a38bdc235",
+              "name": "is_parsed",
+              "value": true,
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        7072,
+        4496
+      ],
+      "id": "49f39837-274e-44d7-a730-e39840020f2e",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "collection": "=app_reviews_{{ $('Webhook2').item.json.body.data }}",
+        "fields": "is_parsed",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        7280,
+        4496
+      ],
+      "id": "4d198544-87e5-497d-8eb9-6445d6f44abc",
+      "name": "Update documents1",
+      "credentials": {
+        "mongoDb": {
+          "id": "15w6IyvgHLjLHFmC",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wordcloud",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        5232,
+        5280
+      ],
+      "id": "4ecb7179-cad6-4352-b29d-f337efc6cf5a",
+      "name": "Webhook3",
+      "webhookId": "5af171ac-096f-4361-8582-0ae7d3795f75"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c66ac8ca-0817-4929-b2ca-25401e993f86",
+              "name": "input",
+              "value": "={{ $json.body.data }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        5472,
+        5280
+      ],
+      "id": "366cd6ed-1296-4b04-9561-178855c4ded3",
+      "name": "Edit Fields3"
+    },
+    {
+      "parameters": {
+        "collection": "=app_reviews_{{ $json.input }}",
+        "options": {
+          "limit": 100
+        }
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        5696,
+        5280
+      ],
+      "id": "41533525-dbf7-4723-8fb0-a9dd23363ee0",
+      "name": "Find documents2",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mongoDb": {
+          "id": "15w6IyvgHLjLHFmC",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        5904,
+        5280
+      ],
+      "id": "3a730e35-a91d-4019-b24d-9cbb68ffccad",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "content": "词云输出",
+        "height": 352,
+        "width": 1344
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        5088,
+        5136
+      ],
+      "typeVersion": 1,
+      "id": "76be3276-719a-470a-bf8b-faa0451bdcb6",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "toRecipients": "filbertchocolate@hotmail.com",
+        "subject": "评论洞察工作台",
+        "bodyContent": "洞察真相已完成！",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        6144,
+        2896
+      ],
+      "id": "dc2b255b-3f28-47d9-ae22-5f81202ff072",
+      "name": "Send a message",
+      "webhookId": "81befb27-ae6b-48e9-80e2-b1537a9faf12",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "GGKBSrpBNOBowHMu",
+          "name": "Microsoft Outlook account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toRecipients": "filbertchocolate@hotmail.com",
+        "subject": "评论洞察工作台",
+        "bodyContent": "PRD已生成！",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.microsoftOutlook",
+      "typeVersion": 2,
+      "position": [
+        6048,
+        4352
+      ],
+      "id": "da637a1c-15dc-436a-9aa0-6c4a580ffa6b",
+      "name": "Send a message1",
+      "webhookId": "a4908573-abc5-44df-a7db-98b564533c73",
+      "credentials": {
+        "microsoftOutlookOAuth2Api": {
+          "id": "GGKBSrpBNOBowHMu",
+          "name": "Microsoft Outlook account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Find documents": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qwen-turbo": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "需求分析",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replace Me": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update源数据标注": {
+      "main": [
+        [
+          {
+            "node": "Replace Me",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "准备关联": {
+      "main": [
+        [
+          {
+            "node": "Update源数据标注",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "需求分析": {
+      "main": [
+        [
+          {
+            "node": "心理转译",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "心理转译",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "心理转译": {
+      "main": [
+        [
+          {
+            "node": "评分仲裁",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "评分仲裁",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "需求分析",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Vector Store": {
+      "main": [
+        [
+          {
+            "node": "Replace Me1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Default Data Loader": {
+      "ai_document": [
+        [
+          {
+            "node": "Simple Vector Store",
+            "type": "ai_document",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recursive Character Text Splitter": {
+      "ai_textSplitter": [
+        [
+          {
+            "node": "Default Data Loader",
+            "type": "ai_textSplitter",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items1": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Simple Vector Store",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replace Me1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI": {
+      "ai_embedding": [
+        [
+          {
+            "node": "Simple Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          },
+          {
+            "node": "Simple Vector Store1",
+            "type": "ai_embedding",
+            "index": 0
+          },
+          {
+            "node": "Simple Vector Store2",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer questions with a vector store": {
+      "ai_tool": [
+        [
+          {
+            "node": "需求分析",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Answer questions with a vector store",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Vector Store1": {
+      "ai_vectorStore": [
+        [
+          {
+            "node": "Answer questions with a vector store",
+            "type": "ai_vectorStore",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "格式化清洗/关联准备": {
+      "main": [
+        [
+          {
+            "node": "上传新表",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "上传新表": {
+      "main": [
+        [
+          {
+            "node": "准备关联",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "评分仲裁": {
+      "main": [
+        [
+          {
+            "node": "格式化清洗/关联准备",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer questions with a vector store1": {
+      "ai_tool": [
+        [
+          {
+            "node": "评分仲裁",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Answer questions with a vector store1",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "MongoDB Atlas Vector Store": {
+      "ai_vectorStore": [
+        [
+          {
+            "node": "Answer questions with a vector store1",
+            "type": "ai_vectorStore",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Embeddings OpenAI1": {
+      "ai_embedding": [
+        [
+          {
+            "node": "MongoDB Atlas Vector Store",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Find documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "再一次格式化清洗",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model4": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook2": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Find documents1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find documents1": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer questions with a vector store2": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Vector Store2": {
+      "ai_vectorStore": [
+        [
+          {
+            "node": "Answer questions with a vector store2",
+            "type": "ai_vectorStore",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model5": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Answer questions with a vector store2",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items2": {
+      "main": [
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replace Me2": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "再一次格式化清洗": {
+      "main": [
+        [
+          {
+            "node": "Update documents",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update documents": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Update documents1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update documents1": {
+      "main": [
+        [
+          {
+            "node": "Replace Me2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields3": {
+      "main": [
+        [
+          {
+            "node": "Find documents2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook3": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find documents2": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "any"
+  },
+  "versionId": "e35eaea9-4e08-4268-9f17-f31f26b77029",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7c1634ba8f7f42d856dff452ab802e27f098c1dbe780f19357badcce4b9b19dc"
+  },
+  "id": "NayDkJzddg01FVuv",
+  "tags": []
+}

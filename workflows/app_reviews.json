@@ -1,0 +1,411 @@
+{
+  "name": "app_reviews",
+  "nodes": [
+    {
+      "parameters": {
+        "url": "={{ $json.input }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        864,
+        352
+      ],
+      "id": "2cc7fe05-bd6e-426e-9841-06a22911ef18",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "content": "获取评论到MongoDB数据库",
+        "height": 304,
+        "width": 1376,
+        "color": 2
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        336,
+        240
+      ],
+      "typeVersion": 1,
+      "id": "99c071f4-1a49-40fb-89f5-7676532d87c6",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "f3cd0daa-5c5a-43d3-b8d3-a06f36559a86",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        416,
+        352
+      ],
+      "id": "f569f918-f688-493d-9452-2d767b8e5056",
+      "name": "Webhook2",
+      "webhookId": "f3cd0daa-5c5a-43d3-b8d3-a06f36559a86"
+    },
+    {
+      "parameters": {
+        "url": "https://itunes.apple.com/search",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "term",
+              "value": "={{ $json.body.app_name }}"
+            },
+            {
+              "name": "country",
+              "value": "cn"
+            },
+            {
+              "name": "entity",
+              "value": "software"
+            },
+            {
+              "name": "limit",
+              "value": "1"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.3,
+      "position": [
+        976,
+        48
+      ],
+      "id": "0609e4c7-9891-4609-bdca-5248070a78b3",
+      "name": "HTTP Request2"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.body.app_name }}",
+        "options": {
+          "systemMessage": "根据User Message输入的中国区苹果AppStore的应用名称，查找该应用的track ID。\n不要编造不存在的track ID。\n\n输出：https://itunes.apple.com/cn/rss/customerreviews/id=\"tracking ID\"/sortBy=mostRecent/json"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        800,
+        -160
+      ],
+      "id": "687521f3-61cf-4311-8ec3-fc7263a6c974",
+      "name": "查找track ID"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "ali/qwen3-max",
+          "mode": "list",
+          "cachedResultName": "ali/qwen3-max"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        816,
+        64
+      ],
+      "id": "95b87330-c243-4893-9719-00039154944c",
+      "name": "Qwen",
+      "credentials": {
+        "openAiApi": {
+          "id": "TfEeHkaNCRrkvl64",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gettracknumber",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        576,
+        -160
+      ],
+      "id": "e09e49f5-1a35-460b-a8ed-5ea920c7c325",
+      "name": "Webhook3",
+      "webhookId": "c8e268d4-3eb5-4451-b39a-bedcabdcb4df"
+    },
+    {
+      "parameters": {
+        "content": "获取AppStore评论URL",
+        "height": 448,
+        "width": 1168,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        336,
+        -240
+      ],
+      "typeVersion": 1,
+      "id": "bc23b573-4fbd-48f7-bb9e-2f1283476934",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"url\": \"{{ $json.output }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1152,
+        -160
+      ],
+      "id": "fb18fd56-0e69-4182-89be-7e48b0824a37",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "// ==========================================\n// 步骤 1: 获取数据库里最新的评论时间 (去重关键)\n// ==========================================\nlet lastDbDate = new Date(0); // 默认为1970年（如果数据库为空，这代表所有新数据都收录）\n\n// 修复：正确获取 Edit Fields 节点的输入\nconst inputFromEditFields = $('Edit Fields1').first().json.input;\n\ntry {\n  // 尝试获取名为 \"GetLastTime\" 节点的输出数据\n  // 注意：这个节点名称必须和你画布上的 MongoDB 读取节点名称完全一致\n  const dbItems = $('GetLastTime').first().json;\n\n  if (dbItems && dbItems.date) {\n    lastDbDate = new Date(dbItems.date);\n  }\n} catch (error) {\n  // 如果读取失败（比如第一次运行，或者没有 GetLastTime 节点），则忽略错误，继续往下执行\n}\n\n// ==========================================\n// 步骤 2: 解析 HTTP Request 的数据\n// ==========================================\nconst rawString = items[0].json.data;\nlet parsedData;\n\ntry {\n  parsedData = JSON.parse(rawString);\n} catch (error) {\n  return []; // 格式不对则停止\n}\n\nconst entries = parsedData.feed.entry || [];\n\n// ==========================================\n// 步骤 3: 配置过滤规则\n// ==========================================\nconst MIN_LENGTH = 5;\n\n// ==========================================\n// 步骤 4: 循环处理 (清洗 + 时间比对)\n// ==========================================\nconst cleanReviews = entries.reduce((resultList, entry) => {\n\n  // 提取基础数据\n  const content = entry.content.label || \"\";\n  const title = entry.title.label || \"\";\n  const entryDateStr = entry.updated.label;\n  const entryDate = new Date(entryDateStr);\n\n  // --------------------\n  // 核心逻辑 A: 时间比对 (去重)\n  // --------------------\n  // 如果这条评论的时间 早于或等于 数据库里最新的时间，说明已经存过了\n  if (entryDate <= lastDbDate) {\n    return resultList; // 跳过这条\n  }\n\n  // --------------------\n  // 核心逻辑 B: 内容筛选 (清洗)\n  // --------------------\n\n  // 1. 过滤掉字数太少的\n  if (content.length < MIN_LENGTH) {\n    return resultList;\n  }\n\n  // --------------------\n  // 核心逻辑 C: 格式化输出\n  // --------------------\n  resultList.push({\n    json: {\n      id: entry.id.label,\n      author: entry.author.name.label,\n      title: title,\n      content: content,\n\n      // 评分 (数字)\n      rating: parseInt(entry['im:rating'].label),\n      // 来源\n      source: \"苹果AppStore_review\",\n\n      version: entry['im:version'].label,\n\n      // 时间 (用于下次比对)\n      date: entryDateStr,\n\n      link: entry.link.attributes.href,\n      // 修复：添加逗号并正确引用变量\n      url: inputFromEditFields\n    }\n  });\n\n  return resultList;\n}, []);\n\n// 返回处理好的新数据给 MongoDB 写入节点\nreturn cleanReviews;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1088,
+        352
+      ],
+      "id": "6a6ad2b6-3a78-47dd-8a8a-1d1fa8df378a",
+      "name": "Code in JavaScript1"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "collection": "=app_reviews_{{ $('Webhook2').item.json.body.data }}",
+        "fields": "id, author, title, content, rating, source, version, date, link, url",
+        "upsert": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.mongoDb",
+      "typeVersion": 1.2,
+      "position": [
+        1312,
+        352
+      ],
+      "id": "23e2eb0f-699d-4f84-bcb0-b704a6fae567",
+      "name": "Update documents1",
+      "alwaysOutputData": true,
+      "credentials": {
+        "mongoDb": {
+          "id": "15w6IyvgHLjLHFmC",
+          "name": "MongoDB account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c66ac8ca-0817-4929-b2ca-25401e993f86",
+              "name": "input",
+              "value": "={{ $json.body.data }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        640,
+        352
+      ],
+      "id": "52715dd6-b984-41e0-a45b-7cd858ec9721",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1520,
+        352
+      ],
+      "id": "2840e024-6b38-4dca-a96a-888454b2073c",
+      "name": "Respond to Webhook1"
+    }
+  ],
+  "pinData": {
+    "Webhook3": [
+      {
+        "json": {
+          "headers": {
+            "host": "filbertchocolate.app.n8n.cloud",
+            "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36 Edg/143.0.0.0",
+            "content-length": "27",
+            "accept": "*/*",
+            "accept-encoding": "gzip, br",
+            "accept-language": "zh-CN,zh;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+            "cdn-loop": "cloudflare; loops=1; subreqs=1",
+            "cf-connecting-ip": "2a0e:dc0:5:e796::1",
+            "cf-ew-via": "15",
+            "cf-ipcountry": "GB",
+            "cf-ray": "9bbe9432714aef40-LHR",
+            "cf-visitor": "{\"scheme\":\"https\"}",
+            "cf-worker": "n8n.cloud",
+            "content-type": "application/json",
+            "origin": "https://4qpbvdxfsw6dx0omxtna6pg6jst97u50bk312fau1b7m7ptl8j-h852644758.scf.usercontent.goog",
+            "priority": "u=1, i",
+            "sec-ch-ua": "\"Microsoft Edge\";v=\"143\", \"Chromium\";v=\"143\", \"Not A(Brand\";v=\"24\"",
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"macOS\"",
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "cross-site",
+            "x-forwarded-for": "2a0e:dc0:5:e796::1, 141.101.98.131",
+            "x-forwarded-host": "filbertchocolate.app.n8n.cloud",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+            "x-forwarded-server": "traefik-prod-users-gwc-50-54974b54fc-788ds",
+            "x-is-trusted": "yes",
+            "x-real-ip": "2a0e:dc0:5:e796::1"
+          },
+          "params": {},
+          "query": {},
+          "body": {
+            "app_name": "蚂蚁阿福"
+          },
+          "webhookUrl": "https://filbertchocolate.app.n8n.cloud/webhook/gettracknumber",
+          "executionMode": "production"
+        }
+      }
+    ]
+  },
+  "connections": {
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook2": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request2": {
+      "ai_tool": [
+        [
+          {
+            "node": "查找track ID",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "查找track ID": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qwen": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "查找track ID",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook3": {
+      "main": [
+        [
+          {
+            "node": "查找track ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript1": {
+      "main": [
+        [
+          {
+            "node": "Update documents1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update documents1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "06acf6a1-70b5-4378-889a-c13d61fe4895",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "7c1634ba8f7f42d856dff452ab802e27f098c1dbe780f19357badcce4b9b19dc"
+  },
+  "id": "dVqC92T1HXNqMvPC",
+  "tags": []
+}
