@@ -206,27 +206,19 @@ curl -X POST https://your-n8n.cloud/webhook/singlecomment \
 
 ## 🚀 快速开始
 
-### 1. 环境配置
-
-```bash
-export OPENAI_API_KEY=your_key
-export MONGODB_URI=your_mongodb_uri
-export SILICONCLOUD_API_KEY=your_key
-```
-
-### 2. 导入工作流
+### 1. 导入工作流
 
 - 将 `workflows/*.json` 导入 n8n
 - 配置 Credentials（OpenAI、MongoDB、Microsoft Outlook）
 
-### 3. 上传产品文档
+### 2. 上传产品文档
 
 ```bash
 curl -X POST https://your-n8n.cloud/webhook/chat-onboarding \
   -F "file=@product_spec.txt"
 ```
 
-### 4. 开始分析
+### 3. 开始分析
 
 ```bash
 # 单条评论
