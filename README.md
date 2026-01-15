@@ -31,7 +31,7 @@
 
 ---
 
-## 🔧 requirements.txt
+## 🔧 requirements
 
 ```
 # LLM API
