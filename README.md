@@ -1,4 +1,4 @@
-基于 **Research Onion + UTAUT2 + RICE** 三重映射框架及多方召回策略的多 Agent 用户评论智能分析系统，覆盖从数据采集、智能分析到 PRD 自动生成的完整闭环。
+基于 **Research Onion + UTAUT2 + RICE** 三重映射框架及多方召回策略的n8n多 Agent 用户评论智能分析系统，覆盖从数据采集、智能分析到 PRD 自动生成的完整闭环。
 
 ## ✨ 功能特性
 
